@@ -32,7 +32,15 @@ async function createPixCharge(amount, userId) {
       expiresAt: response.data.expires_at
     };
   } catch (error) {
-    console.error('Erro ao criar cobrança Pix:', error.response?.data || error.message);
+    let msg = '';
+    if (error.response) {
+      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}$;
+    } else if (error.request) {
+      msg = `request: ${error.request}`
+    } else {
+      msg = `message: ${error.message}`
+    }
+    console.error('+++ ERRO PIP8 DEBUG +++', msg);
     throw error;
   }
 }
@@ -51,7 +59,15 @@ async function checkPixStatus(txid) {
 
     return response.data;
   } catch (error) {
-    console.error('Erro ao verificar status Pix:', error.message);
+    let msg = '';
+    if (error.response) {
+      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}$;
+    } else if (error.request) {
+      msg = `request: ${error.request}`
+    } else {
+      msg = `message: ${error.message}`
+    }
+    console.error('+++ ERRO PIP8 DEBUG +++', msg);
     throw error;
   }
 }
@@ -59,4 +75,4 @@ async function checkPixStatus(txid) {
 module.exports = {
   createPixCharge,
   checkPixStatus
-};
+  };
