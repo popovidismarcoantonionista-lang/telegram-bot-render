@@ -2,7 +2,7 @@ const axios = require('axios');
 
 const API_KEY = process.env.PIXINTEGRA_API_KEY;
 const API_TOKEN = process.env.PIXINTEGRA_API_TOKEN;
-const BASE_URL = 'https://api.pixintegra.com';
+const BASE_URL = 'https://api.pixintegra.net';
 
 async function createPixCharge(amount, userId) {
   try {
