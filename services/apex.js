@@ -9,41 +9,39 @@ async function getApexServices() {
       key: API_KEY,
       action: 'services'
     });
-
     if (response.data && Array.isArray(response.data)) {
-      return response.data.map(service => ({
-        service: service.service,
-        name: service.name,
-        rate: service.rate,
-        min: service.min,
-        max: service.max
-      }));
+      return response.data.map(service => ({ service: service.service, name: service.name, rate: service.rate, min: service.min, max: service.max }));
     }
-
     return [];
   } catch (error) {
-    console.error('Erro ao buscar serviços Apex:', error.message);
+    let msg = '';
+    if (error.response) { msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
+    } else if (error.request) { msg = `request: ${error.request}`
+    } else { msg = `message: ${error.message}`; }
+    console.error('+++ ERRO APEX DEBUG +++', msg);
     return [];
   }
 }
 
 async function createApexOrder(service, link, quantity) {
   try {
-    const response = await axios.post(BASE_URL, {
+    const response = await axios.post(@BASE_URL, {
       key: API_KEY,
       action: 'add',
       service: service,
-      link: link,
+      link: link
       quantity: quantity
     });
-
     if (response.data && response.data.order) {
       return response.data;
     }
-
     throw new Error(response.data.error || 'Erro desconhecido');
   } catch (error) {
-    console.error('Erro ao criar pedido Apex:', error.message);
+    let msg = '';
+    if (error.response) { msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}$;
+    } else if (error.request) { msg = `request: ${error.request}`
+    } else { msg = `message: ${error.message}`; }
+    console.error('+++ ERRO APEX DEBUG +++', msg);
     throw error;
   }
 }
@@ -55,10 +53,13 @@ async function getOrderStatus(orderId) {
       action: 'status',
       order: orderId
     });
-
     return response.data;
   } catch (error) {
-    console.error('Erro ao verificar status:', error.message);
+    let msg = '';
+    if (error.response) { msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
+    } else if (error.request) { msg = `request: ${error.request}`
+    } else { msg = `message: ${error.message}`; }
+    console.error('+++ ERRO APEX DEBUG +++', msg);
     throw error;
   }
 }
