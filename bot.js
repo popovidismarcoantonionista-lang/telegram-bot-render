@@ -358,7 +358,7 @@ bot.on('text', async (ctx) => {
         `💳 *Cobrança Pix Gerada*\\n\\n` +
         `💰 Valor: R$ ${amount.toFixed(2)}\\n` +
         `💖 TXID: ${charge.txid}\\n\\n` +
-        `📋 *Pix Copia e Cola:*\\n\\`${charge.pixCopiaECola}\\`\\n\\n` +
+        `📋 *Pix Copia e Cola:*\\n\`${charge.pixCopiaECola}\`\\n\\n` +
         `⏱ Válido por: 30 minutos\\n\\n` +
         `✅ O saldo será creditado automaticamente após o pagamento.`,
         { parse_mode: 'Markdown', reply_markup: getMainKeyboard() }
