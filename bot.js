@@ -164,3 +164,197 @@ bot.hears('⬅️ Voltar', async (ctx) => {
     { reply_markup: getMainKeyboard() }
   );
 });
+// ==========================================
+// HANDLER DE TEXTO (FLUXOS)
+// ==========================================
+bot.on('text', async (ctx) => {
+  const userId = ctx.from.id;
+  const session = userSessions.get(userId);
+
+  if (!session) return;
+
+  const text = ctx.message.text;
+
+  // ========== FLUXO SMS ==========
+  if (session.action === 'sms_select_service') {
+    const serviceIndex = parseInt(text) - 1;
+
+    if (isNaN(serviceIndex) || !session.services[serviceIndex]) {
+      return ctx.reply('❌ Serviço inválido. Digite um número da lista.');
+    }
+
+    const service = session.services[serviceIndex];
+    const balance = await getUserBalance(userId);
+
+    if (balance < service.price) {
+      return ctx.reply(
+        `❌ Saldo insuficiente!\n\n` +
+        `💰 Seu saldo: R$ ${balance.toFixed(2)}\n` +
+        `💵 Necessário: R$ ${service.price.toFixed(2)}\n\n` +
+        `Use /start para depositar.`
+      );
+    }
+
+    await ctx.reply('⏳ Gerando número...');
+
+    try {
+      const result = await purchaseNumber(service.code, 'br');
+
+      await updateUserBalance(userId, -service.price);
+
+      await ctx.reply(
+        `✅ *Número gerado!*\n\n` +
+        `📱 Número: ${result.phone}\n` +
+        `🆔 ID: ${result.activationId}\n` +
+        `⏱ Válido por: 20 minutos\n\n` +
+        `💡 Aguardando SMS...`,
+        { parse_mode: 'Markdown' }
+      );
+
+      userSessions.set(userId, {
+        action: 'sms_waiting',
+        activationId: result.activationId,
+        attempts: 0
+      });
+
+      checkSmsCode(ctx, userId, result.activationId);
+    } catch (error) {
+      console.error('Erro ao comprar SMS:', error);
+      await ctx.reply('❌ Erro ao gerar número. Tente novamente.');
+    }
+  }
+
+  // ========== FLUXO SEGUIDORES ==========
+  else if (session.action === 'followers_order') {
+    const parts = text.split(' ');
+
+    if (parts.length !== 3) {
+      return ctx.reply('❌ Formato inválido. Use: número_serviço link quantidade');
+    }
+
+    const serviceIndex = parseInt(parts[0]) - 1;
+    const link = parts[1];
+    const quantity = parseInt(parts[2]);
+
+    if (isNaN(serviceIndex) || !session.services[serviceIndex]) {
+      return ctx.reply('❌ Serviço inválido.');
+    }
+
+    const service = session.services[serviceIndex];
+    const cost = (parseFloat(service.rate) / 1000) * quantity;
+    const balance = await getUserBalance(userId);
+
+    if (balance < cost) {
+      return ctx.reply(
+        `❌ Saldo insuficiente!\n\n` +
+        `💰 Seu saldo: R$ ${balance.toFixed(2)}\n` +
+        `💵 Necessário: R$ ${cost.toFixed(2)}`
+      );
+    }
+
+    await ctx.reply('⏳ Criando pedido...');
+
+    try {
+      const order = await createApexOrder(service.service, link, quantity);
+
+      await updateUserBalance(userId, -cost);
+
+      await ctx.reply(
+        `✅ *Pedido criado!*\n\n` +
+        `🆔 ID: ${order.order}\n` +
+        `👥 Quantidade: ${quantity}\n` +
+        `💰 Custo: R$ ${cost.toFixed(2)}\n\n` +
+        `⏱ Processamento iniciado!`,
+        { parse_mode: 'Markdown', reply_markup: getMainKeyboard() }
+      );
+
+      userSessions.delete(userId);
+    } catch (error) {
+      console.error('Erro ao criar pedido:', error);
+      await ctx.reply('❌ Erro ao criar pedido. Tente novamente.');
+    }
+  }
+
+  // ========== FLUXO PIX ==========
+  else if (session.action === 'pix_amount') {
+    const amount = parseFloat(text);
+
+    if (isNaN(amount) || amount < 5) {
+      return ctx.reply('❌ Valor inválido. Mínimo: R$ 5,00');
+    }
+
+    await ctx.reply('⏳ Gerando cobrança Pix...');
+
+    try {
+      const charge = await createPixCharge(amount, userId);
+
+      const msg =
+        '💳 *Cobrança Pix Gerada*\n\n' +
+        `💰 Valor: R$ ${amount.toFixed(2)}\n` +
+        `🔖 TXID: ${charge.txid}\n\n` +
+        '📋 *Pix Copia e Cola:*\n' +
+        '```' + '\n' +
+        charge.pixCopiaECola + '\n' +
+        '```' + '\n\n' +
+        '⏱ Válido por: 30 minutos\n\n' +
+        '✅ O saldo será creditado automaticamente após o pagamento.';
+
+      await ctx.reply(
+        msg,
+        { parse_mode: 'Markdown', reply_markup: getMainKeyboard() }
+      );
+
+      userSessions.delete(userId);
+    } catch (error) {
+      console.error('Erro ao gerar Pix:', error);
+      await ctx.reply('❌ Erro ao gerar cobrança. Tente novamente.');
+    }
+  }
+});
+
+// ==========================================
+// POLLING DE SMS
+// ==========================================
+async function checkSmsCode(ctx, userId, activationId, maxAttempts = 40) {
+  const session = userSessions.get(userId);
+
+  if (!session || session.action !== 'sms_waiting') return;
+
+  if (session.attempts >= maxAttempts) {
+    userSessions.delete(userId);
+    return ctx.reply('⏱ Tempo esgotado. Nenhum SMS recebido.', {
+      reply_markup: getMainKeyboard()
+    });
+  }
+
+  try {
+    const code = await getSmsCode(activationId);
+
+    if (code) {
+      userSessions.delete(userId);
+
+      const msg =
+        '✅ *SMS RECEBIDO!*\n\n' +
+        '💐 Código:\n' +
+        '```' + '\n' +
+        code + '\n' +
+        '```' + '\n\n' +
+        '💡 Use este código no aplicativo.';
+
+      await ctx.reply(
+        msg,
+        { parse_mode: 'Markdown', reply_markup: getMainKeyboard() }
+      );
+    } else {
+      session.attempts++;
+      userSessions.set(userId, session);
+      setTimeout(() => checkSmsCode(ctx, userId, activationId, maxAttempts), 15000);
+    }
+  } catch (error) {
+    console.error('Erro ao verificar SMS:', error);
+  }
+}
+
+// Exportar bot
+module.exports = { bot };
+      
