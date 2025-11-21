@@ -23,7 +23,7 @@ async function getAvailableServices(country = 'br') {
           services.push({
             code: serviceCode,
             name: serviceCode.toUpperCase(),
-            price: parseFloat(service.cost) * 5.5, // Conversão aproximada RUB -> BRL
+            price: parseFloat(service.cost) * 5.5, // conversão RUB -> BRL aproximada
             available: service.count
           });
         }
@@ -43,14 +43,14 @@ async function purchaseNumber(service, country = 'br') {
       params: {
         api_key: API_KEY,
         action: 'getNumber',
-        service: service,
-        country: country
+        service,
+        country
       }
     });
 
     const data = response.data;
 
-    if (data.includes('ACCESS_NUMBER')) {
+    if (typeof data === 'string' && data.includes('ACCESS_NUMBER')) {
       const parts = data.split(':');
       return {
         activationId: parts[1],
@@ -77,7 +77,7 @@ async function getSmsCode(activationId) {
 
     const data = response.data;
 
-    if (data.includes('STATUS_OK')) {
+    if (typeof data === 'string' && data.includes('STATUS_OK')) {
       const code = data.split(':')[1];
       return code;
     }
