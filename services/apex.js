@@ -25,11 +25,11 @@ async function getApexServices() {
 
 async function createApexOrder(service, link, quantity) {
   try {
-    const response = await axios.post(@BASE_URL, {
+    const response = await axios.post(BASE_URL, {
       key: API_KEY,
       action: 'add',
       service: service,
-      link: link
+      link: link,
       quantity: quantity
     });
     if (response.data && response.data.order) {
