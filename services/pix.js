@@ -10,11 +10,11 @@ async function createPixCharge(amount, userId) {
       `${BASE_URL}/v1/cobrancas`,
       {
         valor: amount.toFixed(2),
-        chave: '092.675.711-33', // Chave Pix CPF
+        chave: 'SUA_CHAVE_PIX_AQUI', // chave Pix (cpf, email, aleatória)
         descricao: `Recarga Bot - User ${userId}`,
         expires_in: 1800, // 30 minutos
         webhook_url: `${process.env.WEBHOOK_URL.replace('/webhook', '')}/pix-callback`,
-        user_id: userId.toString() // Passar user_id para o callback
+        user_id: userId.toString()
       },
       {
         headers: {
@@ -36,43 +36,15 @@ async function createPixCharge(amount, userId) {
     if (error.response) {
       msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
     } else if (error.request) {
-      msg = `request: ${error.request}`
+      msg = `request: ${error.request}`;
     } else {
-      msg = `message: ${error.message}`
+      msg = `message: ${error.message}`;
     }
-    console.error('+++ ERRO PIP8 DEBUG +++', msg);
-    throw error;
-  }
-}
-
-async function checkPixStatus(txid) {
-  try {
-    const response = await axios.get(
-      `${BASE_URL}/v1/cobrancas/${txid}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${API_TOKEN}`,
-          'X-API-Key': API_KEY
-        }
-      }
-    );
-
-    return response.data;
-  } catch (error) {
-    let msg = '';
-    if (error.response) {
-      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
-    } else if (error.request) {
-      msg = `request: ${error.request}`
-    } else {
-      msg = `message: ${error.message}`
-    }
-    console.error('+++ ERRO PIP8 DEBUG +++', msg);
+    console.error('+++ ERRO PIXINTEGRA DEBUG +++', msg);
     throw error;
   }
 }
 
 module.exports = {
-  createPixCharge,
-  checkPixStatus
-  };
+  createPixCharge
+};
