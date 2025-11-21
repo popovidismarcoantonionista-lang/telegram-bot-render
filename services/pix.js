@@ -34,7 +34,7 @@ async function createPixCharge(amount, userId) {
   } catch (error) {
     let msg = '';
     if (error.response) {
-      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}$;
+      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
     } else if (error.request) {
       msg = `request: ${error.request}`
     } else {
@@ -61,7 +61,7 @@ async function checkPixStatus(txid) {
   } catch (error) {
     let msg = '';
     if (error.response) {
-      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}$;
+      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
     } else if (error.request) {
       msg = `request: ${error.request}`
     } else {
