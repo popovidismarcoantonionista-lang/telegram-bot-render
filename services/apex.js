@@ -38,7 +38,7 @@ async function createApexOrder(service, link, quantity) {
     throw new Error(response.data.error || 'Erro desconhecido');
   } catch (error) {
     let msg = '';
-    if (error.response) { msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}$;
+    if (error.response) { msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
     } else if (error.request) { msg = `request: ${error.request}`
     } else { msg = `message: ${error.message}`; }
     console.error('+++ ERRO APEX DEBUG +++', msg);
