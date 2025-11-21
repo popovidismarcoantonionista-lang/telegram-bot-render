@@ -1,17 +1,22 @@
 const axios = require('axios');
+const qs = require('qs'); // querystring serializer
 
 const API_KEY = process.env.APEX_API_KEY;
-// Endpoint CORRETO da Apex Seguidores:
 const BASE_URL = 'https://apexseguidores.com/api/v2';
 
 async function getApexServices() {
   try {
-    const response = await axios.post(BASE_URL, {
+    const data = qs.stringify({
       key: API_KEY,
       action: 'services'
     });
 
-    // A API correta retorna um ARRAY de serviços
+    const response = await axios.post(BASE_URL, data, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
     if (response.data && Array.isArray(response.data)) {
       return response.data.map(service => ({
         service: service.service,
@@ -22,7 +27,10 @@ async function getApexServices() {
       }));
     }
 
-    console.error('+++ ERRO APEX DEBUG (services) +++ Resposta inesperada:', JSON.stringify(response.data).slice(0, 400));
+    console.error(
+      '+++ ERRO APEX DEBUG (services) +++ Resposta inesperada:',
+      JSON.stringify(response.data).slice(0, 400)
+    );
     return [];
   } catch (error) {
     let msg = '';
@@ -40,12 +48,18 @@ async function getApexServices() {
 
 async function createApexOrder(service, link, quantity) {
   try {
-    const response = await axios.post(BASE_URL, {
+    const data = qs.stringify({
       key: API_KEY,
       action: 'add',
       service,
       link,
       quantity
+    });
+
+    const response = await axios.post(BASE_URL, data, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
     });
 
     if (response.data && response.data.order) {
@@ -68,11 +82,18 @@ async function createApexOrder(service, link, quantity) {
 
 async function getOrderStatus(orderId) {
   try {
-    const response = await axios.post(BASE_URL, {
+    const data = qs.stringify({
       key: API_KEY,
       action: 'status',
       order: orderId
     });
+
+    const response = await axios.post(BASE_URL, data, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    });
+
     return response.data;
   } catch (error) {
     let msg = '';
