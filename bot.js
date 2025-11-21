@@ -5,15 +5,75 @@ const { getUserBalance, createUser, updateUserBalance } = require('./database/su
 const { getAvailableServices, purchaseNumber, getSmsCode } = require('./services/sms');
 const { getApexServices, createApexOrder } = require('./services/apex');
 const { createPixCharge } = require('./services/pix');
+const axios = require('axios');
 
 const bot = new Telegraf(process.env.BOT_TOKEN);
 
 // Armazenamento temporário de sessões
 const userSessions = new Map();
 
-// ==========================================
+// ==========================================================
+// COMANDO DE TESTE DE APIS (NOVO!)
+// ==========================================================
+bot.command('testapis', async (ctx) => {
+  await ctx.reply('🧀 Iniciando testes das APIs...\nAguarde uns 30 segundos.');
+
+  let result = '🚀 =========== TESTE DE APIS ============\n\n';
+
+  // Teste Apex Seguidores
+  result += '🧪 TESTE APEX SEGUIDORESL\n';
+  try {
+    const services = await getApexServices();
+    if (services.length > 0) {
+      result += `“ Sucesso! ${services.length} serviços encontrados\n`;
+      result += `Primeiro: ${services[0].name}\n`;
+    } else {
+      result += '❌ Nenhum serviço retornado\n';
+    }
+  } catch (error) {
+    if (error.response) {
+      result += `❌ Erro ${error.response.status}: ${JSON.stringify(error.response.data)}\n`;
+    } else {
+      result += `❌ Erro: ${error.message}\n`;
+    }
+  }
+
+  // Teste PixIntegra
+  result += '\n💳 TESTE PIXINTEGRA\n';
+  try {
+    const pixData = await axios.post(
+      'https://api.pixintegra.net/v1/cobrancas',
+      {
+        valor: '5.00',
+        chave: '092.675.711-33',
+        descricao: 'Teste API',
+        expires_in: 1800
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${process.env.PIXINTEGRA_API_TOKEN}`,
+          'Content-Type': 'application/json',
+          'X-API-Key': process.env.PIXINTEGRA_API_KEY
+        },
+        timeout: 10000
+      }
+    );
+    result += `✅ Sucesso! TID: ${pixData.data.txid || 'N/A'}\n`;
+  } catch (error) {
+    if (error.response) {
+      result += `❌ Erro ${error.response.status}: ${JSON.stringify(error.response.data)}\n`;
+    } else {
+      result += `❌ Erro: ${error.message}\n`;
+    }
+  }
+
+  result += '\n🎉 ============ FIM DO TESTE ============';
+  await ctx.reply(result);
+});
+
+// ==========================================================
 // COMANDO /START
-// ==========================================
+// ==========================================================
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const username = ctx.from.username || ctx.from.first_name;
@@ -22,9 +82,9 @@ bot.start(async (ctx) => {
   await createUser(userId, username);
 
   await ctx.reply(
-    `🤖 *Bem-vindo ao Bot de Serviços!*\n\n` +
-    `👤 Usuário: ${username}\n` +
-    `🆔 ID: ${userId}\n\n` +
+    `🤀 *Bem-vindo ao Bot de Serviços!*\\n\\n` +
+    `👤 Usuário: ${username}\\n\\n` +
+    `🆔 ID: ${userId}\\n\\n` +
     `Escolha uma opção abaixo:`,
     {
       parse_mode: 'Markdown',
@@ -33,14 +93,14 @@ bot.start(async (ctx) => {
   );
 });
 
-// ==========================================
+// ==========================================================
 // MENU PRINCIPAL
-// ==========================================
+// ==========================================================
 bot.hears('💬 Comprar SMS', async (ctx) => {
   userSessions.set(ctx.from.id, { action: 'sms_select_service' });
 
   await ctx.reply(
-    '📱 *Comprar SMS Descartável*\n\n' +
+    '📱 *Comprar SMS Descartável*\\n\\n' +
     'Carregando serviços disponíveis...',
     { parse_mode: 'Markdown' }
   );
@@ -52,11 +112,11 @@ bot.hears('💬 Comprar SMS', async (ctx) => {
       return ctx.reply('❌ Nenhum serviço disponível no momento.');
     }
 
-    let message = '📋 *Serviços disponíveis:*\n\n';
+    let message = '💹 *Serviços disponíveis:*\\n\\n';
     services.slice(0, 10).forEach((service, index) => {
-      message += `${index + 1}. ${service.name} - R$ ${service.price.toFixed(2)}\n`;
+      message += `${index + 1}. ${service.name} - R$ ${service.price.toFixed(2)}\\n`;
     });
-    message += '\n💡 Digite o número do serviço desejado.';
+    message += '\\n\\n💡 Digite o número do serviço desejado.';
 
     userSessions.set(ctx.from.id, { 
       action: 'sms_select_service', 
@@ -73,9 +133,9 @@ bot.hears('💬 Comprar SMS', async (ctx) => {
   }
 });
 
-bot.hears('👥 Comprar Seguidores', async (ctx) => {
+bot.hears('👩, Comprar Seguidores', async (ctx) => {
   await ctx.reply(
-    '👥 *Comprar Seguidores*\n\n' +
+    '👥 *Comprar Seguidores*\\n\\n' +
     'Carregando serviços disponíveis...',
     { parse_mode: 'Markdown' }
   );
@@ -87,13 +147,13 @@ bot.hears('👥 Comprar Seguidores', async (ctx) => {
       return ctx.reply('❌ Nenhum serviço disponível no momento.');
     }
 
-    let message = '📋 *Serviços de Seguidores:*\n\n';
+    let message = '💹 *Serviços de Seguidores:*\\n\\n';
     services.slice(0, 10).forEach((service, index) => {
-      message += `${index + 1}. ${service.name}\n`;
-      message += `   💰 Preço: R$ ${service.rate}/1000\n`;
-      message += `   ⏱ Min: ${service.min} | Max: ${service.max}\n\n`;
+      message += `${index + 1}. ${service.name}\\n`;
+      message += `    💰 Preço: R$ ${service.rate}/1000\\n`;
+      message += `    ⏡ Min: ${service.min} | Max: ${service.max}\\n\\n`;
     });
-    message += '💡 Digite: número_serviço link quantidade\n';
+    message += '💡 Digite: número_serviço link quantidade\\n';
     message += 'Exemplo: 1 https://instagram.com/user 1000';
 
     userSessions.set(ctx.from.id, { 
@@ -113,9 +173,9 @@ bot.hears('👥 Comprar Seguidores', async (ctx) => {
 
 bot.hears('💳 Depositar via Pix', async (ctx) => {
   await ctx.reply(
-    '💰 *Depositar via Pix*\n\n' +
-    'Digite o valor que deseja depositar:\n' +
-    'Exemplo: 50\n\n' +
+    '💰 *Depositar via Pix*\\n\\n' +
+    'Digite o valor que deseja depositar:\\n' +
+    'Exemplo: 50\\n\\n' +
     '💡 Valor mínimo: R$ 5,00',
     {
       parse_mode: 'Markdown',
@@ -131,7 +191,7 @@ bot.hears('💰 Meu Saldo', async (ctx) => {
     const balance = await getUserBalance(ctx.from.id);
 
     await ctx.reply(
-      `💰 *Seu Saldo Atual*\n\n` +
+      `💰 *Seu Saldo Atual*\\n\\n` +
       `💵 R$ ${balance.toFixed(2)}`,
       {
         parse_mode: 'Markdown',
@@ -145,10 +205,10 @@ bot.hears('💰 Meu Saldo', async (ctx) => {
 
 bot.hears('📞 Suporte', async (ctx) => {
   await ctx.reply(
-    '📞 *Suporte ao Cliente*\n\n' +
-    '📧 Email: suporte@seubot.com\n' +
-    '💬 Telegram: @seu_suporte\n' +
-    '⏰ Horário: 9h às 18h\n\n' +
+    '📞 *Suporte ao Cliente*\\n\\n' +
+    '📧 Email: suporte@seubot.com\\n' +
+    '💬 Telegram: @seu_suporte\\n' +
+    '⏰ Horário: 9h às 18h\\n\\n' +
     '💡 Resposta em até 24h úteis.',
     {
       parse_mode: 'Markdown',
@@ -161,14 +221,14 @@ bot.hears('⬅️ Voltar', async (ctx) => {
   userSessions.delete(ctx.from.id);
 
   await ctx.reply(
-    '🏠 Menu Principal',
+    '🏐 Menu Principal',
     { reply_markup: getMainKeyboard() }
   );
 });
 
-// ==========================================
+// ==========================================================
 // HANDLER DE TEXTO (FLUXOS)
-// ==========================================
+// =========================================================
 bot.on('text', async (ctx) => {
   const userId = ctx.from.id;
   const session = userSessions.get(userId);
@@ -177,7 +237,7 @@ bot.on('text', async (ctx) => {
 
   const text = ctx.message.text;
 
-  // ========== FLUXO SMS ==========
+  // ========= FLUXO SMS =========
   if (session.action === 'sms_select_service') {
     const serviceIndex = parseInt(text) - 1;
 
@@ -190,9 +250,9 @@ bot.on('text', async (ctx) => {
 
     if (balance < service.price) {
       return ctx.reply(
-        `❌ Saldo insuficiente!\n\n` +
-        `💰 Seu saldo: R$ ${balance.toFixed(2)}\n` +
-        `💵 Necessário: R$ ${service.price.toFixed(2)}\n\n` +
+        `❌ Saldo insuficiente!\\n\\n` +
+        `💰 Seu saldo: R$ ${balance.toFixed(2)}\\n` +
+        `💵 Necessário: R$ ${service.price.toFixed(2)}\\n\\n` +
         `Use /start para depositar.`
       );
     }
@@ -206,10 +266,10 @@ bot.on('text', async (ctx) => {
       await updateUserBalance(userId, -service.price);
 
       await ctx.reply(
-        `✅ *Número gerado!*\n\n` +
-        `📱 Número: ${result.phone}\n` +
-        `🆔 ID: ${result.activationId}\n` +
-        `⏱ Válido por: 20 minutos\n\n` +
+        `✅ *Número gerado!*\\n\\n` +
+        `📱 Número: ${result.phone}\\n` +
+        `🆔 ID: ${result.activationId}\\n` +
+        `⏱ Válido por: 20 minutos\\n\\n` +
         `💡 Aguardando SMS...`,
         { parse_mode: 'Markdown' }
       );
@@ -230,7 +290,7 @@ bot.on('text', async (ctx) => {
     }
   }
 
-  // ========== FLUXO SEGUIDORES ==========
+  // ========= FLUXO SEGUIDORES =========
   else if (session.action === 'followers_order') {
     const parts = text.split(' ');
 
@@ -252,8 +312,8 @@ bot.on('text', async (ctx) => {
 
     if (balance < cost) {
       return ctx.reply(
-        `❌ Saldo insuficiente!\n\n` +
-        `💰 Seu saldo: R$ ${balance.toFixed(2)}\n` +
+        `❌ Saldo insuficiente!\\n\\n` +
+        `💰 Seu saldo: R$ ${balance.toFixed(2)}\\n` +
         `💵 Necessário: R$ ${cost.toFixed(2)}`
       );
     }
@@ -266,10 +326,10 @@ bot.on('text', async (ctx) => {
       await updateUserBalance(userId, -cost);
 
       await ctx.reply(
-        `✅ *Pedido criado!*\n\n` +
-        `🆔 ID: ${order.order}\n` +
-        `👥 Quantidade: ${quantity}\n` +
-        `💰 Custo: R$ ${cost.toFixed(2)}\n\n` +
+        `✅ *Pedido criado!*\\n\\n` +
+        `🆔 ID: ${order.order}\\n` +
+        `👩, Quantidade: ${quantity}\\n` +
+        `💰 Custo: R$ ${cost.toFixed(2)}\\n\\n` +
         `⏱ Processamento iniciado!`,
         { parse_mode: 'Markdown', reply_markup: getMainKeyboard() }
       );
@@ -281,7 +341,7 @@ bot.on('text', async (ctx) => {
     }
   }
 
-  // ========== FLUXO PIX ==========
+  // ========= FLUXO PIX =========
   else if (session.action === 'pix_amount') {
     const amount = parseFloat(text);
 
@@ -295,11 +355,11 @@ bot.on('text', async (ctx) => {
       const charge = await createPixCharge(amount, userId);
 
       await ctx.reply(
-        `💳 *Cobrança Pix Gerada*\n\n` +
-        `💰 Valor: R$ ${amount.toFixed(2)}\n` +
-        `🔖 TXID: ${charge.txid}\n\n` +
-        `📋 *Pix Copia e Cola:*\n\`${charge.pixCopiaECola}\`\n\n` +
-        `⏱ Válido por: 30 minutos\n\n` +
+        `💳 *Cobrança Pix Gerada*\\n\\n` +
+        `💰 Valor: R$ ${amount.toFixed(2)}\\n` +
+        `💖 TXID: ${charge.txid}\\n\\n` +
+        `📋 *Pix Copia e Cola:*\\n\\`${charge.pixCopiaECola}\\`\\n\\n` +
+        `⏱ Válido por: 30 minutos\\n\\n` +
         `✅ O saldo será creditado automaticamente após o pagamento.`,
         { parse_mode: 'Markdown', reply_markup: getMainKeyboard() }
       );
@@ -312,9 +372,9 @@ bot.on('text', async (ctx) => {
   }
 });
 
-// ==========================================
+// ==========================================================
 // POLLING DE SMS
-// ==========================================
+// ==========================================================
 async function checkSmsCode(ctx, userId, activationId, maxAttempts = 40) {
   const session = userSessions.get(userId);
 
@@ -334,8 +394,8 @@ async function checkSmsCode(ctx, userId, activationId, maxAttempts = 40) {
       userSessions.delete(userId);
 
       await ctx.reply(
-        `✅ *SMS RECEBIDO!*\n\n` +
-        `🔐 Código: \`${code}\`\n\n` +
+        `“ *SMS RECEBIDO!*\\n\\n` +
+        `💐 Código: \\`${code}\\`\\n\\n` +
         `💡 Use este código no aplicativo.`,
         { parse_mode: 'Markdown', reply_markup: getMainKeyboard() }
       );
