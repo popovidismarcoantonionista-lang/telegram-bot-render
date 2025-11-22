@@ -1,26 +1,33 @@
-const axios = require('axios');
+const { criarCobrancaPix } = require('./paguepix');
 
-const pixintegraClient = axios.create({
-  baseURL: 'https://api.pixintegra.com.br/v1',  // ✅ URL CORRETA com /v1
-  headers: {
-    'Authorization': 'Bearer apitoken_f6815555698bded8004cbdce0598651999af6f40c9eba8',
-    'X-API-Key': 'apikey_bf4b4688300dd58afed9e11ffe28b40157d7c8bb1f9cda',
-    'Content-Type': 'application/json'
+// Quando um usuário quiser fazer um pagamento:
+async function handlePagamento(chatId, valor, descricao, dadosUsuario) {
+  const resultado = await criarCobrancaPix({
+    valor: valor * 100, // Converter reais para centavos
+    descricao: descricao,
+    expiracao: 30, // 30 minutos
+    pagadorNome: dadosUsuario.nome,
+    pagadorCpf: dadosUsuario.cpf,
+    pagadorEmail: dadosUsuario.email
+  });
+  
+  if (resultado.success) {
+    // Enviar QR Code para o usuário no Telegram
+    await bot.sendMessage(chatId, 
+      `💰 *Pagamento PIX Gerado!*\n\n` +
+      `Valor: R$ ${(resultado.amount / 100).toFixed(2)}\n` +
+      `Expira em: ${resultado.expiration}\n\n` +
+      `Use o QR Code abaixo para pagar:`,
+      { parse_mode: 'Markdown' }
+    );
+    
+    // Enviar QR Code como imagem ou PIX Copia e Cola
+    await bot.sendMessage(chatId, `\`${resultado.qr_code}\``, {
+      parse_mode: 'Markdown'
+    });
+  } else {
+    await bot.sendMessage(chatId, 
+      `❌ Erro ao gerar pagamento: ${resultado.error}`
+    );
   }
-});
-
-// ✅ Criar cobrança (endpoint correto)
-pixintegraClient.post('/cob', {  // ⚠️ Note: é '/cob', não '/cobrancas'
-  txid: "20231128-001",
-  valor: { 
-    original: "150.00" 
-  },
-  pagador: {
-    nome: "João da Silva",
-    cpf: "12345678909",
-    email: "joao@email.com"
-  },
-  expiracao: 3600
-})
-.then(response => console.log(response.data))
-.catch(error => console.error(error));
+}
