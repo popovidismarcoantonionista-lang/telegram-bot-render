@@ -1,50 +1,17 @@
 const axios = require('axios');
 
-const API_KEY = process.env.PIXINTEGRA_API_KEY;
-const API_TOKEN = process.env.PIXINTEGRA_API_TOKEN;
-const BASE_URL = 'https://api.pixintegra.net';
-
-async function createPixCharge(amount, userId) {
-  try {
-    const response = await axios.post(
-      `${BASE_URL}/v1/cobrancas`,
-      {
-        valor: amount.toFixed(2),
-        chave: 'SUA_CHAVE_PIX_AQUI', // chave Pix (cpf, email, aleatória)
-        descricao: `Recarga Bot - User ${userId}`,
-        expires_in: 1800, // 30 minutos
-        webhook_url: `${process.env.WEBHOOK_URL.replace('/webhook', '')}/pix-callback`,
-        user_id: userId.toString()
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${API_TOKEN}`,
-          'Content-Type': 'application/json',
-          'X-API-Key': API_KEY
-        }
-      }
-    );
-
-    return {
-      txid: response.data.txid,
-      pixCopiaECola: response.data.brcode || response.data.pix_copia_cola,
-      qrCode: response.data.qr_code,
-      expiresAt: response.data.expires_at
-    };
-  } catch (error) {
-    let msg = '';
-    if (error.response) {
-      msg = `status: ${error.response.status} | data: ${JSON.stringify(error.response.data)}`;
-    } else if (error.request) {
-      msg = `request: ${error.request}`;
-    } else {
-      msg = `message: ${error.message}`;
-    }
-    console.error('+++ ERRO PIXINTEGRA DEBUG +++', msg);
-    throw error;
+const pixintegraClient = axios.create({
+  baseURL: 'https://api.pixintegra.com.br',  // Updated endpoint
+  headers: {
+    'Authorization': 'Bearer apitoken_f6815555698bded8004cbdce0598651999af6f40c9eba8',
+    'X-API-Key': 'apikey_bf4b4688300dd58afed9e11ffe28b40157d7c8bb1f9cda',
+    'Content-Type': 'application/json'
   }
-}
+});
 
-module.exports = {
-  createPixCharge
-};
+// Your POST request
+pixintegraClient.post('/v1/cobrancas', {
+  // your payload
+})
+.then(response => console.log(response.data))
+.catch(error => console.error(error));
