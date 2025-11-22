@@ -1,132 +1,185 @@
-app.post('/pix-callback', async (req, res) => {
-  try {
-    const { status, valor, user_id } = req.body;
-
-    if (status === 'approved' || status === 'paid') {
-      const PERCENT_LUCRO = 0.70; // 70% p/ você, 30% p/ créditos
-      const valorTotal = parseFloat(valor);
-      const valorCredito = Math.floor(valorTotal * (1 - PERCENT_LUCRO) * 100) / 100;
-
-      const { updateUserBalance } = require('./database/supabase');
-      await updateUserBalance(user_id, valorCredito);
-
-      await bot.telegram.sendMessage(
-        user_id,
-        `✅ Pagamento Pix confirmado!\n\n` +
-        `💵 Depósito: R$ ${valorTotal.toFixed(2)}\n` +
-        `💸 Créditos adicionados: R$ ${valorCredito.toFixed(2)}\n\n` +
-        `Seu saldo já está disponível no bot.`
-      );
-
-      return res.status(200).json({ success: true });
-    }
-
-    res.status(200).json({ message: 'Pagamento não aprovado' });
-  } catch (error) {
-    console.error('❌ Erro no callback Pix:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-const TelegramBot = require('node-telegram-bot-api');
+const { Telegraf } = require('telegraf');
 const express = require('express');
 const app = express();
 
-// Configuração
+// ========================================
+// CONFIGURAÇÃO
+// ========================================
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const RENDER_URL = process.env.RENDER_URL || 'https://telegram-bot-render-mazi.onrender.com';
 const PORT = process.env.PORT || 3000;
 
-// Criar bot
-const bot = new TelegramBot(TELEGRAM_TOKEN);
+// URL automática do Render (o Render fornece essa variável)
+const RENDER_EXTERNAL_URL = process.env.RENDER_EXTERNAL_URL;
+const RENDER_SERVICE_NAME = process.env.RENDER_SERVICE_NAME || 'telegram-bot-render-mazi';
 
-// Configurar webhook do Telegram
-async function setupTelegramWebhook() {
+// Construir URL base
+const BASE_URL = RENDER_EXTERNAL_URL || 
+                 process.env.RENDER_URL || 
+                 `https://${RENDER_SERVICE_NAME}.onrender.com`;
+
+const WEBHOOK_PATH = '/webhook';
+const WEBHOOK_URL = `${BASE_URL}${WEBHOOK_PATH}`;
+
+console.log('🌐 Base URL:', BASE_URL);
+console.log('🔗 Webhook URL:', WEBHOOK_URL);
+
+// Criar bot
+const bot = new Telegraf(TELEGRAM_TOKEN);
+
+// ========================================
+// CONFIGURAR WEBHOOK DO TELEGRAM
+// ========================================
+async function setupWebhook() {
   try {
-    const webhookUrl = `${RENDER_URL}/webhook`;
-    
     console.log('🔗 Configurando webhook do Telegram...');
-    console.log(`   URL: ${webhookUrl}`);
+    console.log(`   URL: ${WEBHOOK_URL}`);
     
-    // Deletar webhook antigo primeiro
-    await bot.deleteWebHook();
+    // Validar URL
+    if (!WEBHOOK_URL || WEBHOOK_URL.includes('undefined')) {
+      throw new Error('URL do webhook está undefined! Verifique as variáveis de ambiente.');
+    }
+    
+    // Deletar webhook antigo
+    await bot.telegram.deleteWebhook({ drop_pending_updates: true });
     console.log('🗑️  Webhook antigo removido');
     
     // Aguardar 1 segundo
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     // Configurar novo webhook
-    const result = await bot.setWebHook(webhookUrl, {
-      drop_pending_updates: true, // Descartar updates pendentes
-      allowed_updates: ['message', 'callback_query'] // Tipos de updates permitidos
+    await bot.telegram.setWebhook(WEBHOOK_URL, {
+      drop_pending_updates: true,
+      allowed_updates: ['message', 'callback_query']
     });
     
-    if (result) {
-      console.log('✅ Webhook do Telegram configurado com sucesso!');
-      
-      // Verificar configuração
-      const info = await bot.getWebHookInfo();
-      console.log('📋 Info do webhook:', {
-        url: info.url,
-        has_custom_certificate: info.has_custom_certificate,
-        pending_update_count: info.pending_update_count,
-        max_connections: info.max_connections
-      });
-    } else {
-      console.error('❌ Falha ao configurar webhook');
-    }
-  } catch (error) {
-    console.error('❌ Erro ao configurar webhook do Telegram:', error.message);
+    console.log('✅ Webhook do Telegram configurado!');
     
-    // Se falhar, tentar modo polling como fallback
-    if (error.message.includes('Failed to resolve host')) {
-      console.log('⚠️  URL ainda não está acessível. Tentando novamente em 10s...');
-      setTimeout(setupTelegramWebhook, 10000);
+    // Verificar
+    const info = await bot.telegram.getWebhookInfo();
+    console.log('📋 Info do webhook:', {
+      url: info.url,
+      pending_updates: info.pending_update_count,
+      max_connections: info.max_connections
+    });
+  } catch (error) {
+    console.error('❌ Erro ao configurar webhook:', error.message);
+    console.error('   Stack:', error.stack);
+    
+    // Tentar novamente em 10 segundos
+    if (error.message.includes('Failed to resolve host') || error.message.includes('undefined')) {
+      console.log('⚠️  Tentando novamente em 10 segundos...');
+      setTimeout(setupWebhook, 10000);
     }
   }
 }
 
-// Middleware
+// ========================================
+// MIDDLEWARE
+// ========================================
 app.use(express.json());
 
-// Rota do webhook do Telegram
-app.post('/webhook', (req, res) => {
-  bot.processUpdate(req.body);
-  res.sendStatus(200);
-});
+// ========================================
+// ROTAS
+// ========================================
 
-// Rota de health check
+// Health check
 app.get('/', (req, res) => {
-  res.json({ 
-    status: 'ok', 
-    message: 'Bot está rodando',
-    timestamp: new Date().toISOString()
+  res.json({
+    status: 'ok',
+    service: 'Telegram Bot',
+    timestamp: new Date().toISOString(),
+    webhook_url: WEBHOOK_URL
   });
 });
 
-// Webhook do PaguePix
-const { processarWebhook } = require('./services/paguepix');
-app.post('/webhook/paguepix', processarWebhook);
+// Webhook do Telegram
+app.post(WEBHOOK_PATH, (req, res) => {
+  bot.handleUpdate(req.body);
+  res.sendStatus(200);
+});
 
-// Iniciar servidor
-app.listen(PORT, async () => {
-  console.log(`🚀 Servidor rodando na porta ${PORT}`);
-  console.log(`🌐 URL: ${RENDER_URL}`);
+// Webhook do PaguePix
+const { processarWebhook: processarWebhookPaguePix } = require('./services/paguepix');
+app.post('/webhook/paguepix', processarWebhookPaguePix);
+
+// ========================================
+// COMANDOS DO BOT
+// ========================================
+bot.command('start', (ctx) => {
+  ctx.reply('🤖 Bot iniciado! Use /pagar <valor> para gerar um PIX.');
+});
+
+bot.command('pagar', async (ctx) => {
+  const valor = parseFloat(ctx.message.text.split(' ')[1]);
   
-  // Aguardar 3 segundos para o servidor estar pronto
-  await new Promise(resolve => setTimeout(resolve, 3000));
+  if (isNaN(valor) || valor <= 0) {
+    return ctx.reply('❌ Uso: /pagar 10.50');
+  }
   
-  // Configurar webhook do Telegram
-  await setupTelegramWebhook();
+  const { criarCobrancaPix } = require('./services/paguepix');
   
-  // Configurar webhook do PaguePix
-  const { registrarWebhook } = require('./services/paguepix');
-  const webhookResult = await registrarWebhook();
+  const resultado = await criarCobrancaPix({
+    valor: Math.round(valor * 100), // Converter para centavos
+    descricao: `Pagamento de R$ ${valor.toFixed(2)}`,
+    expiracao: 30
+  });
   
-  if (webhookResult.success) {
-    console.log('✅ Webhook PaguePix registrado!');
+  if (resultado.success) {
+    ctx.reply(
+      `💰 *PIX Gerado!*\n\n` +
+      `Valor: R$ ${(resultado.amount / 100).toFixed(2)}\n` +
+      `ID: \`${resultado.charge_id}\`\n` +
+      `Expira em: 30 minutos\n\n` +
+      `📱 *PIX Copia e Cola:*\n\`${resultado.qr_code}\``,
+      { parse_mode: 'Markdown' }
+    );
   } else {
-    console.log('⚠️  Webhook PaguePix:', webhookResult.error || 'Já existe');
+    ctx.reply(`❌ Erro: ${resultado.error}`);
   }
 });
 
-module.exports = { bot };
+// ========================================
+// INICIAR SERVIDOR
+// ========================================
+app.listen(PORT, async () => {
+  console.log(`🚀 Servidor rodando na porta ${PORT}`);
+  console.log(`🌐 URL pública: ${BASE_URL}`);
+  
+  // Aguardar servidor estar pronto
+  await new Promise(resolve => setTimeout(resolve, 3000));
+  
+  // Configurar webhook do Telegram
+  await setupWebhook();
+  
+  // Configurar webhook do PaguePix
+  try {
+    const { registrarWebhook } = require('./services/paguepix');
+    const result = await registrarWebhook();
+    
+    if (result.success) {
+      console.log('✅ Webhook PaguePix registrado!');
+    } else {
+      console.log('ℹ️  Webhook PaguePix:', result.message || result.error);
+    }
+  } catch (error) {
+    console.error('⚠️  Erro ao registrar webhook PaguePix:', error.message);
+  }
+});
+
+// Tratamento de erros
+process.on('unhandledRejection', (error) => {
+  console.error('❌ Unhandled rejection:', error);
+});
+
+module.exports = { bot, app };
+📋 Variáveis de Ambiente no Render
+Adicione no painel do Render (Environment):
+
+TELEGRAM_BOT_TOKEN=seu_token_aqui
+RENDER_URL=https://telegram-bot-render-mazi.onrender.com
+PAGUEPIX_CLIENT_ID=981e56a97f908360f9c3452804fce44c872f984c
+PAGUEPIX_CLIENT_SECRET=925509895a99f4a22adab7d6ce55a281ab11d73d69f74cee30bc7804ced56b95
+PAGUEPIX_BASE_URL=https://api.paguepix.com.br
+PAGUEPIX_WEBHOOK_URL=https://telegram-bot-render-mazi.onrender.com/webhook/paguepix
+PORT=3000
+        
